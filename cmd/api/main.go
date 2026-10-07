@@ -5,6 +5,7 @@
 //	api                         serve the HTTP API
 //	api migrate up|down|status  manage the database schema
 //	api user promote <email>    grant the admin role
+//	api seed-demo               load a sample catalog (idempotent)
 package main
 
 import (
@@ -26,6 +27,7 @@ import (
 
 	"github.com/FernandaSpineli/techstore/internal/app"
 	"github.com/FernandaSpineli/techstore/internal/auth"
+	"github.com/FernandaSpineli/techstore/internal/demo"
 	"github.com/FernandaSpineli/techstore/internal/payment"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
@@ -78,8 +80,15 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 		return migrate(ctx, logger, db, args[1])
 	case len(args) == 3 && args[0] == "user" && args[1] == "promote":
 		return promote(ctx, cfg, logger, db, args[2])
+	case len(args) == 1 && args[0] == "seed-demo":
+		n, err := demo.Seed(ctx, db)
+		if err != nil {
+			return err
+		}
+		logger.Info("demo.seeded", "products_created", n)
+		return nil
 	default:
-		return errors.New("usage: api [migrate up|down|status | user promote <email>]")
+		return errors.New("usage: api [migrate up|down|status | user promote <email> | seed-demo]")
 	}
 }
 

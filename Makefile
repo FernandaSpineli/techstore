@@ -3,7 +3,7 @@ LINT := docker run --rm -v $(CURDIR):/app -w /app \
 	-v golangci-cache:/root/.cache \
 	golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) golangci-lint
 
-.PHONY: help run build test test-unit cover lint fmt tidy up down logs
+.PHONY: help run build test test-unit cover lint fmt tidy up down logs seed admin
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-10s %s\n", $$1, $$2}'
@@ -41,3 +41,9 @@ down: ## Stop the stack
 
 logs: ## Follow API logs
 	docker compose logs -f api
+
+seed: ## Load the sample catalog into the running stack
+	docker compose run --rm migrate seed-demo
+
+admin: ## Grant admin to an existing account: make admin EMAIL=you@example.com
+	docker compose run --rm migrate user promote $(EMAIL)
