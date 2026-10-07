@@ -1,19 +1,32 @@
 name: techstore
 
 # Credentials below are for local development only.
+x-app: &app
+  build: .
+  image: techstore-api:dev
+  environment:
+    APP_ENV: development
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    DATABASE_URL: postgres://techstore:techstore@postgres:5432/techstore?sslmode=disable
+    REDIS_URL: redis://redis:6379/0
+
 services:
-  api:
-    build: .
-    ports:
-      - "${HTTP_PORT:-8080}:8080"
-    environment:
-      APP_ENV: development
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      DATABASE_URL: postgres://techstore:techstore@postgres:5432/techstore?sslmode=disable
-      REDIS_URL: redis://redis:6379/0
+  # Applies schema migrations once, before the API starts.
+  migrate:
+    <<: *app
+    command: ["migrate", "up"]
     depends_on:
       postgres:
         condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     restart: unless-stopped
