@@ -19,7 +19,7 @@ func TestSecretNeverLeaks(t *testing.T) {
 
 	outputs := map[string]string{
 		"%v":   fmt.Sprintf("%v", s),
-		"%s":   fmt.Sprintf("%s", s),
+		"%s":   fmt.Sprintf("dsn=%s", s),
 		"%#v":  fmt.Sprintf("%#v", cfg),
 		"%+v":  fmt.Sprintf("%+v", cfg),
 		"slog": logs.String(),

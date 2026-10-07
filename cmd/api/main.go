@@ -86,7 +86,8 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer) erro
 	}
 
 	logger.Info("http.server.stopping", "timeout", cfg.ShutdownTimeout.String())
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	// ctx is already cancelled here; keep its values but give shutdown its own deadline.
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.ShutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
