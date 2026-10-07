@@ -49,7 +49,7 @@ func TestSMTPSenderDeliversToARealServer(t *testing.T) {
 		t.Fatalf("Send: %v", err)
 	}
 
-	resp, err := http.Get(apiURL + "/api/v1/messages") //nolint:noctx // test helper
+	resp, err := http.Get(apiURL + "/api/v1/messages")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestSMTPSenderDeliversToARealServer(t *testing.T) {
 		t.Errorf("message = %s, want %s", got, want)
 	}
 
-	text, err := http.Get(apiURL + "/api/v1/message/" + m.ID) //nolint:noctx // test helper
+	text, err := http.Get(apiURL + "/api/v1/message/" + m.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
