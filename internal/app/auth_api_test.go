@@ -73,12 +73,12 @@ func TestRegisterValidation(t *testing.T) {
 		http.StatusUnprocessableEntity, "VALIDATION_FAILED")
 
 	fields := map[string]bool{}
-	for _, d := range e.Error.Details {
+	for _, d := range e.problems(t) {
 		fields[d.Field] = true
 	}
 	for _, f := range []string{"email", "password", "name"} {
 		if !fields[f] {
-			t.Errorf("no validation problem reported for %s: %+v", f, e.Error.Details)
+			t.Errorf("no validation problem reported for %s: %s", f, e.Error.Details)
 		}
 	}
 }
@@ -189,8 +189,8 @@ func TestChangePassword(t *testing.T) {
 	e := expectError(t, ta.do(http.MethodPut, "/api/v1/users/me/password",
 		map[string]string{"current_password": "wrong-password", "new_password": "new-password-1"}, tok.AccessToken),
 		http.StatusUnprocessableEntity, "VALIDATION_FAILED")
-	if len(e.Error.Details) != 1 || e.Error.Details[0].Field != "current_password" {
-		t.Errorf("details = %+v, want current_password problem", e.Error.Details)
+	if ps := e.problems(t); len(ps) != 1 || ps[0].Field != "current_password" {
+		t.Errorf("details = %+v, want current_password problem", ps)
 	}
 
 	expect[any](t, ta.do(http.MethodPut, "/api/v1/users/me/password",

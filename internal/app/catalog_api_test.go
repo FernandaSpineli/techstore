@@ -317,8 +317,8 @@ func TestProductWrites(t *testing.T) {
 
 	e := expectError(t, ta.do(http.MethodPost, "/api/v1/products", map[string]any{"name": ""}, c.admin),
 		http.StatusUnprocessableEntity, "VALIDATION_FAILED")
-	if len(e.Error.Details) < 3 {
-		t.Errorf("expected problems for category_id, name and brand: %+v", e.Error.Details)
+	if ps := e.problems(t); len(ps) < 3 {
+		t.Errorf("expected problems for category_id, name and brand: %+v", ps)
 	}
 	expectError(t, ta.do(http.MethodPost, "/api/v1/products",
 		map[string]any{"name": "X", "brand": "Y", "category_id": "01a11699-7a06-7d19-ace9-45b3da7b647b"}, c.admin),

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FernandaSpineli/techstore/internal/auth"
+	"github.com/FernandaSpineli/techstore/internal/cart"
 	"github.com/FernandaSpineli/techstore/internal/catalog"
 	"github.com/FernandaSpineli/techstore/internal/inventory"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
@@ -61,6 +62,7 @@ func New(d Deps) (*App, error) {
 		user:      user.NewHandler(d.DB),
 		catalog:   catalog.NewHandler(catalog.NewStore(d.DB)),
 		inventory: inventory.NewHandler(inventory.NewStore(d.DB)),
+		cart:      cart.NewHandler(cart.NewService(d.DB, catalog.Currency)),
 	})
 	return a, nil
 }

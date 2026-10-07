@@ -99,11 +99,25 @@ type apiError struct {
 	Error struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
-		Details []struct {
-			Field   string `json:"field"`
-			Message string `json:"message"`
-		} `json:"details"`
+		// Details is a list of field problems for VALIDATION_FAILED and an
+		// error-specific object otherwise.
+		Details json.RawMessage `json:"details"`
 	} `json:"error"`
+}
+
+type fieldProblem struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// problems decodes the field problems of a VALIDATION_FAILED error.
+func (e apiError) problems(t *testing.T) []fieldProblem {
+	t.Helper()
+	var ps []fieldProblem
+	if err := json.Unmarshal(e.Error.Details, &ps); err != nil {
+		t.Fatalf("details %s are not field problems: %v", e.Error.Details, err)
+	}
+	return ps
 }
 
 // expectError asserts an error response with the given status and code.
