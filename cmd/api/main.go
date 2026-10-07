@@ -52,6 +52,18 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 
 	logger := logging.New(stdout, cfg.LogLevel).With("service", "techstore", "env", string(cfg.Env))
 	slog.SetDefault(logger)
+	logger.Info("app.starting",
+		"http_addr", cfg.HTTPAddr,
+		"base_url", cfg.BaseURL,
+		"log_level", cfg.LogLevel.String(),
+		"access_token_ttl", cfg.AccessTokenTTL.String(),
+		"order_reservation_ttl", cfg.OrderReservationTTL.String(),
+		"auth_rate_limit_per_min", cfg.AuthRateLimit,
+		"api_rate_limit_per_min", cfg.APIRateLimit,
+		"catalog_cache_ttl", cfg.CatalogCacheTTL.String(),
+		"payments_enabled", cfg.StripeSecretKey != "",
+		"smtp_addr", cfg.SMTPAddr,
+	)
 
 	db, err := postgres.Connect(ctx, cfg.DatabaseURL.Reveal())
 	if err != nil {

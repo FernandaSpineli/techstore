@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
 )
@@ -141,5 +142,21 @@ func TestRecoverReturns500WithoutStackTrace(t *testing.T) {
 	}
 	if !strings.Contains(logs.String(), "http.panic") || !strings.Contains(logs.String(), "secret internals") {
 		t.Error("panic was not logged")
+	}
+}
+
+func TestAccessLogWarnsOnSlowRequests(t *testing.T) {
+	var logs bytes.Buffer
+	h := AccessLog(logging.New(&logs, slog.LevelInfo))(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		time.Sleep(SlowRequestThreshold + 10*time.Millisecond)
+	}))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+
+	var line map[string]any
+	if err := json.Unmarshal(logs.Bytes(), &line); err != nil {
+		t.Fatal(err)
+	}
+	if line["level"] != "WARN" {
+		t.Errorf("level = %v, want WARN for a slow request", line["level"])
 	}
 }

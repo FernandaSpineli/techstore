@@ -68,6 +68,10 @@ func newRequestID() string {
 	return hex.EncodeToString(b)
 }
 
+// SlowRequestThreshold raises the access log of slower requests to WARN, so
+// they stand out without a separate metric.
+const SlowRequestThreshold = time.Second
+
 type accessLogAttrsKey struct{}
 
 type accessLogAttrs struct{ attrs []slog.Attr }
@@ -95,9 +99,13 @@ func AccessLog(base *slog.Logger) Middleware {
 
 			next.ServeHTTP(rec, r)
 
+			elapsed := time.Since(start)
 			level := slog.LevelInfo
-			if rec.status >= http.StatusInternalServerError {
+			switch {
+			case rec.status >= http.StatusInternalServerError:
 				level = slog.LevelError
+			case elapsed >= SlowRequestThreshold:
+				level = slog.LevelWarn
 			}
 			logger.LogAttrs(r.Context(), level, "http.request",
 				slog.String("method", r.Method),
@@ -105,7 +113,7 @@ func AccessLog(base *slog.Logger) Middleware {
 				slog.String("path", r.URL.Path),
 				slog.Int("status", rec.status),
 				slog.Int("bytes", rec.bytes),
-				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
+				slog.Int64("duration_ms", elapsed.Milliseconds()),
 				slog.String("remote_ip", ClientIP(r)),
 				slog.GroupAttrs("", extra.attrs...), // an empty group key inlines the attrs
 			)
