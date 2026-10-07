@@ -9,6 +9,9 @@ x-app: &app
     LOG_LEVEL: ${LOG_LEVEL:-info}
     DATABASE_URL: postgres://techstore:techstore@postgres:5432/techstore?sslmode=disable
     REDIS_URL: redis://redis:6379/0
+    APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+    JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}
+    SMTP_ADDR: mailpit:1025
 
 services:
   # Applies schema migrations once, before the API starts.
@@ -29,6 +32,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     restart: unless-stopped
 
   postgres:
@@ -56,6 +61,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Catches every outgoing email; open http://localhost:8025 to read them.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
 
 volumes:
   pgdata:

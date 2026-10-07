@@ -1,4 +1,4 @@
-package server
+package app
 
 import (
 	"bytes"
@@ -11,11 +11,30 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
 )
 
+// newHandler builds the app without a database, enough for routes that do
+// not touch it.
+func newHandler(t *testing.T, checks map[string]func(context.Context) error) http.Handler {
+	t.Helper()
+	a, err := New(Deps{
+		Config:          config.Config{JWTSecret: "0123456789abcdef0123456789abcdef"},
+		Logger:          logging.New(&bytes.Buffer{}, slog.LevelInfo),
+		ReadinessChecks: checks,
+		BcryptCost:      bcrypt.MinCost,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a.Handler
+}
+
 func TestHealthz(t *testing.T) {
-	h := NewHandler(Deps{Logger: logging.New(&bytes.Buffer{}, slog.LevelInfo)})
+	h := newHandler(t, nil)
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
@@ -29,7 +48,7 @@ func TestHealthz(t *testing.T) {
 }
 
 func TestUnknownRouteUsesErrorEnvelope(t *testing.T) {
-	h := NewHandler(Deps{Logger: logging.New(&bytes.Buffer{}, slog.LevelInfo)})
+	h := newHandler(t, nil)
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/nope", nil))
@@ -79,7 +98,7 @@ func TestReadyz(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(Deps{Logger: logging.New(&bytes.Buffer{}, slog.LevelInfo), ReadinessChecks: tt.checks})
+			h := newHandler(t, tt.checks)
 
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))

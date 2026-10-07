@@ -25,7 +25,24 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	DatabaseURL     Secret
 	RedisURL        Secret
+
+	// BaseURL is the public URL of the shop, used to build links in emails.
+	BaseURL string
+
+	JWTSecret        Secret
+	AccessTokenTTL   time.Duration
+	RefreshTokenTTL  time.Duration
+	PasswordResetTTL time.Duration
+
+	SMTPAddr     string
+	SMTPUsername string
+	SMTPPassword Secret
+	MailFrom     string
 }
+
+// minJWTSecretLen is 32 bytes: HS256 keys shorter than the hash output
+// weaken the signature.
+const minJWTSecretLen = 32
 
 // Load builds a Config from getenv (usually os.Getenv). It reports every
 // invalid variable at once so a misconfigured deploy fails with a single,
@@ -38,6 +55,14 @@ func Load(getenv func(string) string) (Config, error) {
 		HTTPAddr:    lookup(getenv, "HTTP_ADDR", ":8080"),
 		DatabaseURL: Secret(getenv("DATABASE_URL")),
 		RedisURL:    Secret(getenv("REDIS_URL")),
+		BaseURL:     lookup(getenv, "APP_BASE_URL", "http://localhost:8080"),
+
+		JWTSecret: Secret(getenv("JWT_SECRET")),
+
+		SMTPAddr:     lookup(getenv, "SMTP_ADDR", "localhost:1025"),
+		SMTPUsername: getenv("SMTP_USERNAME"),
+		SMTPPassword: Secret(getenv("SMTP_PASSWORD")),
+		MailFrom:     lookup(getenv, "MAIL_FROM", "TechStore <no-reply@techstore.local>"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -45,6 +70,9 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if cfg.RedisURL == "" {
 		errs = append(errs, errors.New("REDIS_URL: required"))
+	}
+	if len(cfg.JWTSecret) < minJWTSecretLen {
+		errs = append(errs, fmt.Errorf("JWT_SECRET: must be at least %d characters", minJWTSecretLen))
 	}
 
 	switch cfg.Env {
@@ -57,9 +85,20 @@ func Load(getenv func(string) string) (Config, error) {
 		errs = append(errs, fmt.Errorf("LOG_LEVEL: %w", err))
 	}
 
-	var err error
-	if cfg.ShutdownTimeout, err = parseDuration(getenv, "SHUTDOWN_TIMEOUT", "15s"); err != nil {
-		errs = append(errs, err)
+	for _, d := range []struct {
+		dst      *time.Duration
+		key, def string
+	}{
+		{&cfg.ShutdownTimeout, "SHUTDOWN_TIMEOUT", "15s"},
+		{&cfg.AccessTokenTTL, "ACCESS_TOKEN_TTL", "15m"},
+		{&cfg.RefreshTokenTTL, "REFRESH_TOKEN_TTL", "720h"},
+		{&cfg.PasswordResetTTL, "PASSWORD_RESET_TTL", "30m"},
+	} {
+		v, err := parseDuration(getenv, d.key, d.def)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		*d.dst = v
 	}
 
 	return cfg, errors.Join(errs...)

@@ -4,6 +4,7 @@
 //
 //	api                         serve the HTTP API
 //	api migrate up|down|status  manage the database schema
+//	api user promote <email>    grant the admin role
 package main
 
 import (
@@ -16,17 +17,20 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
 
+	"github.com/FernandaSpineli/techstore/internal/app"
+	"github.com/FernandaSpineli/techstore/internal/auth"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
+	"github.com/FernandaSpineli/techstore/internal/platform/mail"
 	"github.com/FernandaSpineli/techstore/internal/platform/postgres"
 	"github.com/FernandaSpineli/techstore/internal/platform/redisx"
-	"github.com/FernandaSpineli/techstore/internal/server"
 )
 
 func main() {
@@ -59,8 +63,10 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout 
 		return serve(ctx, cfg, logger, db)
 	case args[0] == "migrate" && len(args) == 2:
 		return migrate(ctx, logger, db, args[1])
+	case len(args) == 3 && args[0] == "user" && args[1] == "promote":
+		return promote(ctx, cfg, logger, db, args[2])
 	default:
-		return errors.New("usage: api [migrate up|down|status]")
+		return errors.New("usage: api [migrate up|down|status | user promote <email>]")
 	}
 }
 
@@ -72,17 +78,23 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger, db *pgxp
 	}
 	defer func() { _ = rdb.Close() }()
 
-	handler := server.NewHandler(server.Deps{
+	application, err := app.New(app.Deps{
+		Config: cfg,
 		Logger: logger,
+		DB:     db,
+		Mailer: newMailer(cfg),
 		ReadinessChecks: map[string]func(context.Context) error{
 			"postgres": db.Ping,
 			"redis":    func(ctx context.Context) error { return rdb.Ping(ctx).Err() },
 		},
 	})
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           handler,
+		Handler:           application.Handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -112,7 +124,34 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger, db *pgxp
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}
+	application.Wait()
 	logger.Info("http.server.stopped")
+	return nil
+}
+
+func newMailer(cfg config.Config) *mail.SMTPSender {
+	return &mail.SMTPSender{
+		Addr:     cfg.SMTPAddr,
+		From:     cfg.MailFrom,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword.Reveal(),
+	}
+}
+
+// promote grants the admin role. Admins are created from the command line so
+// that no HTTP endpoint can ever escalate privileges.
+func promote(ctx context.Context, cfg config.Config, logger *slog.Logger, db *pgxpool.Pool, email string) error {
+	svc, err := auth.NewService(auth.Config{
+		JWTSecret:  []byte(cfg.JWTSecret.Reveal()),
+		BcryptCost: auth.DefaultBcryptCost,
+	}, db, nil)
+	if err != nil {
+		return err
+	}
+	if err := svc.PromoteToAdmin(ctx, strings.ToLower(strings.TrimSpace(email))); err != nil {
+		return fmt.Errorf("promote %s: %w", email, err)
+	}
+	logger.Info("auth.user.promoted", "role", string(auth.RoleAdmin))
 	return nil
 }
 

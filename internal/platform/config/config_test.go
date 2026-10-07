@@ -12,6 +12,7 @@ func env(overrides map[string]string) func(string) string {
 	vars := map[string]string{
 		"DATABASE_URL": "postgres://localhost/techstore",
 		"REDIS_URL":    "redis://localhost:6379/0",
+		"JWT_SECRET":   "0123456789abcdef0123456789abcdef",
 	}
 	for k, v := range overrides {
 		vars[k] = v
@@ -35,6 +36,9 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.ShutdownTimeout != 15*time.Second {
 		t.Errorf("ShutdownTimeout = %v, want 15s", cfg.ShutdownTimeout)
+	}
+	if cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 720*time.Hour || cfg.PasswordResetTTL != 30*time.Minute {
+		t.Errorf("unexpected token TTLs: %v %v %v", cfg.AccessTokenTTL, cfg.RefreshTokenTTL, cfg.PasswordResetTTL)
 	}
 }
 
@@ -60,11 +64,13 @@ func TestLoadReportsAllInvalidVariables(t *testing.T) {
 		"SHUTDOWN_TIMEOUT": "-1s",
 		"DATABASE_URL":     "",
 		"REDIS_URL":        "",
+		"JWT_SECRET":       "too-short",
+		"ACCESS_TOKEN_TTL": "soon",
 	}))
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
-	for _, key := range []string{"APP_ENV", "LOG_LEVEL", "SHUTDOWN_TIMEOUT", "DATABASE_URL", "REDIS_URL"} {
+	for _, key := range []string{"APP_ENV", "LOG_LEVEL", "SHUTDOWN_TIMEOUT", "DATABASE_URL", "REDIS_URL", "JWT_SECRET", "ACCESS_TOKEN_TTL"} {
 		if !strings.Contains(err.Error(), key) {
 			t.Errorf("error %q does not mention %s", err, key)
 		}
