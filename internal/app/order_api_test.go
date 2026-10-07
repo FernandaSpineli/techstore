@@ -133,7 +133,7 @@ func TestPlaceOrderFailuresChangeNothing(t *testing.T) {
 
 	// A product in the cart is archived.
 	expect[cartView](t, ta.do(http.MethodPatch, "/api/v1/cart/items/"+c.iphone128.ID, map[string]int{"quantity": 1}, user), http.StatusOK)
-	expect[product](t, ta.do(http.MethodPatch, "/api/v1/products/"+c.iphone.ID, map[string]string{"status": "archived"}, c.admin), http.StatusOK)
+	expect[product](t, ta.do(http.MethodPatch, "/api/v1/admin/products/"+c.iphone.ID, map[string]string{"status": "archived"}, c.admin), http.StatusOK)
 	expectError(t, ta.do(http.MethodPost, "/api/v1/orders", nil, user), http.StatusConflict, "CART_HAS_UNAVAILABLE_ITEMS")
 
 	if got := ta.stock(c.admin, c.iphone128.ID); got.Reserved != 0 {

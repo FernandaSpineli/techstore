@@ -160,8 +160,8 @@ func TestCatalogWritesRequireAdmin(t *testing.T) {
 		{http.MethodGet, "/api/v1/admin/products"},
 		{http.MethodGet, "/api/v1/admin/products/" + someID},
 		{http.MethodPost, "/api/v1/products"},
-		{http.MethodPatch, "/api/v1/products/" + someID},
-		{http.MethodDelete, "/api/v1/products/" + someID},
+		{http.MethodPatch, "/api/v1/admin/products/" + someID},
+		{http.MethodDelete, "/api/v1/admin/products/" + someID},
 		{http.MethodPost, "/api/v1/products/" + someID + "/variants"},
 		{http.MethodPatch, "/api/v1/variants/" + someID},
 		{http.MethodGet, "/api/v1/variants/" + someID + "/inventory"},
@@ -337,7 +337,7 @@ func TestProductWrites(t *testing.T) {
 		http.StatusNotFound, "PRODUCT_NOT_FOUND")
 
 	// Archiving removes a product from the public catalog.
-	expect[product](t, ta.do(http.MethodPatch, "/api/v1/products/"+c.galaxy.ID, map[string]string{"status": "archived"}, c.admin), http.StatusOK)
+	expect[product](t, ta.do(http.MethodPatch, "/api/v1/admin/products/"+c.galaxy.ID, map[string]string{"status": "archived"}, c.admin), http.StatusOK)
 	if slices.Contains(ta.listSlugs(""), "galaxy-s24") {
 		t.Error("archived product still listed")
 	}
@@ -370,9 +370,9 @@ func TestDeleteRules(t *testing.T) {
 		SELECT o.id, $2, 'iPhone 15', '128GB', 'IP15-128', 499900, 1 FROM o`, userID, c.iphone128.ID); err != nil {
 		t.Fatal(err)
 	}
-	expectError(t, ta.do(http.MethodDelete, "/api/v1/products/"+c.iphone.ID, nil, c.admin), http.StatusConflict, "PRODUCT_HAS_ORDERS")
+	expectError(t, ta.do(http.MethodDelete, "/api/v1/admin/products/"+c.iphone.ID, nil, c.admin), http.StatusConflict, "PRODUCT_HAS_ORDERS")
 
-	expect[any](t, ta.do(http.MethodDelete, "/api/v1/products/"+c.pixel.ID, nil, c.admin), http.StatusNoContent)
+	expect[any](t, ta.do(http.MethodDelete, "/api/v1/admin/products/"+c.pixel.ID, nil, c.admin), http.StatusNoContent)
 	expectError(t, ta.do(http.MethodGet, "/api/v1/admin/products/"+c.pixel.ID, nil, c.admin), http.StatusNotFound, "PRODUCT_NOT_FOUND")
 }
 

@@ -168,7 +168,7 @@ func TestCartFlagsLinesThatBecameUnavailable(t *testing.T) {
 
 	// Stock drops, a product is archived and a price changes after the fact.
 	expect[stockLevel](t, ta.do(http.MethodPut, "/api/v1/variants/"+c.iphone128.ID+"/inventory", map[string]int{"on_hand": 2}, c.admin), http.StatusOK)
-	expect[product](t, ta.do(http.MethodPatch, "/api/v1/products/"+c.galaxy.ID, map[string]string{"status": "archived"}, c.admin), http.StatusOK)
+	expect[product](t, ta.do(http.MethodPatch, "/api/v1/admin/products/"+c.galaxy.ID, map[string]string{"status": "archived"}, c.admin), http.StatusOK)
 	expect[variant](t, ta.do(http.MethodPatch, "/api/v1/variants/"+c.iphone128.ID, map[string]int{"price_cents": 459900}, c.admin), http.StatusOK)
 
 	got := expect[cartView](t, ta.do(http.MethodGet, "/api/v1/cart", nil, user), http.StatusOK)

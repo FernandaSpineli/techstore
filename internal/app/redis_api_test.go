@@ -43,7 +43,7 @@ func TestCatalogIsCachedAndInvalidatedByAdminWrites(t *testing.T) {
 		t.Fatalf("cache headers = %q then %q", first.Header().Get("X-Cache"), second.Header().Get("X-Cache"))
 	}
 
-	expect[product](t, ta.do(http.MethodPatch, "/api/v1/products/"+c.iphone.ID, map[string]string{"name": "iPhone 15 (2023)"}, c.admin), http.StatusOK)
+	expect[product](t, ta.do(http.MethodPatch, "/api/v1/admin/products/"+c.iphone.ID, map[string]string{"name": "iPhone 15 (2023)"}, c.admin), http.StatusOK)
 	after := ta.do(http.MethodGet, "/api/v1/products/iphone-15", nil, "")
 	if after.Header().Get("X-Cache") != "MISS" || expect[product](t, after, http.StatusOK).Name != "iPhone 15 (2023)" {
 		t.Errorf("stale product served after an admin update: %s", after.Body)
@@ -51,7 +51,7 @@ func TestCatalogIsCachedAndInvalidatedByAdminWrites(t *testing.T) {
 
 	// A failed admin write does not invalidate.
 	ta.do(http.MethodGet, "/api/v1/products/iphone-15", nil, "")
-	expectError(t, ta.do(http.MethodPatch, "/api/v1/products/"+c.iphone.ID, map[string]string{"status": "bogus"}, c.admin),
+	expectError(t, ta.do(http.MethodPatch, "/api/v1/admin/products/"+c.iphone.ID, map[string]string{"status": "bogus"}, c.admin),
 		http.StatusUnprocessableEntity, "VALIDATION_FAILED")
 	if rec := ta.do(http.MethodGet, "/api/v1/products/iphone-15", nil, ""); rec.Header().Get("X-Cache") != "HIT" {
 		t.Error("a rejected write invalidated the cache")
