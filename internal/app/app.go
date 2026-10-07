@@ -18,6 +18,7 @@ import (
 	"github.com/FernandaSpineli/techstore/internal/catalog"
 	"github.com/FernandaSpineli/techstore/internal/inventory"
 	"github.com/FernandaSpineli/techstore/internal/order"
+	"github.com/FernandaSpineli/techstore/internal/payment"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/mail"
 	"github.com/FernandaSpineli/techstore/internal/user"
@@ -31,6 +32,8 @@ type Deps struct {
 	Mailer mail.Sender
 	// ReadinessChecks are run by GET /readyz, keyed by dependency name.
 	ReadinessChecks map[string]func(context.Context) error
+	// PaymentGateway creates checkout sessions; nil disables payments.
+	PaymentGateway payment.Gateway
 	// BcryptCost overrides auth.DefaultBcryptCost; tests lower it for speed.
 	BcryptCost int
 }
@@ -71,6 +74,8 @@ func New(d Deps) (*App, error) {
 		inventory: inventory.NewHandler(inventory.NewStore(d.DB)),
 		cart:      cart.NewHandler(cart.NewService(d.DB, catalog.Currency)),
 		order:     order.NewHandler(orderSvc),
+		payment: payment.NewHandler(payment.NewService(
+			d.DB, d.PaymentGateway, d.Config.StripeWebhookSecret.Reveal(), d.Config.BaseURL)),
 	})
 	return a, nil
 }

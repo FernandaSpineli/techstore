@@ -26,6 +26,7 @@ import (
 
 	"github.com/FernandaSpineli/techstore/internal/app"
 	"github.com/FernandaSpineli/techstore/internal/auth"
+	"github.com/FernandaSpineli/techstore/internal/payment"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
 	"github.com/FernandaSpineli/techstore/internal/platform/mail"
@@ -78,11 +79,19 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger, db *pgxp
 	}
 	defer func() { _ = rdb.Close() }()
 
+	var gateway payment.Gateway
+	if key := cfg.StripeSecretKey.Reveal(); key != "" {
+		gateway = payment.NewStripeGateway(key)
+	} else {
+		logger.Warn("payment.disabled", "reason", "STRIPE_SECRET_KEY is not set; checkout will answer 503")
+	}
+
 	application, err := app.New(app.Deps{
-		Config: cfg,
-		Logger: logger,
-		DB:     db,
-		Mailer: newMailer(cfg),
+		Config:         cfg,
+		Logger:         logger,
+		DB:             db,
+		Mailer:         newMailer(cfg),
+		PaymentGateway: gateway,
 		ReadinessChecks: map[string]func(context.Context) error{
 			"postgres": db.Ping,
 			"redis":    func(ctx context.Context) error { return rdb.Ping(ctx).Err() },

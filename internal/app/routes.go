@@ -8,6 +8,7 @@ import (
 	"github.com/FernandaSpineli/techstore/internal/catalog"
 	"github.com/FernandaSpineli/techstore/internal/inventory"
 	"github.com/FernandaSpineli/techstore/internal/order"
+	"github.com/FernandaSpineli/techstore/internal/payment"
 	"github.com/FernandaSpineli/techstore/internal/platform/httpx"
 	"github.com/FernandaSpineli/techstore/internal/user"
 )
@@ -20,6 +21,7 @@ type handlers struct {
 	inventory *inventory.Handler
 	cart      *cart.Handler
 	order     *order.Handler
+	payment   *payment.Handler
 }
 
 // routes lists every endpoint in one place, with the middleware that guards
@@ -30,7 +32,8 @@ func routes(d Deps, authSvc *auth.Service, hs handlers) http.Handler {
 	admin := func(next http.Handler) http.Handler {
 		return signedIn(auth.RequireRole(auth.RoleAdmin)(next))
 	}
-	authH, userH, catalogH, inventoryH, cartH, orderH := hs.auth, hs.user, hs.catalog, hs.inventory, hs.cart, hs.order
+	authH, userH, catalogH, inventoryH, cartH, orderH, paymentH :=
+		hs.auth, hs.user, hs.catalog, hs.inventory, hs.cart, hs.order, hs.payment
 
 	type h = httpx.HandlerFunc
 
@@ -67,6 +70,10 @@ func routes(d Deps, authSvc *auth.Service, hs handlers) http.Handler {
 	mux.Handle("GET /api/v1/orders", signedIn(h(orderH.List)))
 	mux.Handle("GET /api/v1/orders/{id}", signedIn(h(orderH.Get)))
 	mux.Handle("POST /api/v1/orders/{id}/cancel", signedIn(h(orderH.Cancel)))
+	mux.Handle("POST /api/v1/orders/{id}/checkout", signedIn(h(paymentH.Checkout)))
+
+	// Payments (public: authenticated by the Stripe signature)
+	mux.Handle("POST /api/v1/payments/webhook", h(paymentH.Webhook))
 
 	// Orders (admin)
 	mux.Handle("GET /api/v1/admin/orders", admin(h(orderH.AdminList)))

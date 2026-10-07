@@ -179,8 +179,8 @@ func TestPaymentsAllowOneOpenAndOneSuccessfulPaymentPerOrder(t *testing.T) {
 
 	insert := func(session, status string) error {
 		_, err := db.Exec(ctx, `
-			INSERT INTO payments (order_id, stripe_checkout_session_id, status, amount_cents, currency)
-			VALUES ($1, $2, $3, 999800, 'brl')`, f.orderID, session, status)
+			INSERT INTO payments (order_id, stripe_checkout_session_id, status, amount_cents, currency, checkout_url, expires_at)
+			VALUES ($1, $2, $3, 999800, 'brl', 'https://checkout.stripe.test', now() + interval '30 minutes')`, f.orderID, session, status)
 		return err
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,40 +17,90 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/FernandaSpineli/techstore/internal/app"
+	"github.com/FernandaSpineli/techstore/internal/payment"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
 	"github.com/FernandaSpineli/techstore/internal/platform/mail"
 	"github.com/FernandaSpineli/techstore/internal/platform/postgres/pgtest"
 )
 
-// testApp is the full application running against a fresh database.
-type testApp struct {
-	t      *testing.T
-	h      http.Handler
-	app    *app.App
-	db     *pgxpool.Pool
-	mailer *fakeMailer
-	logs   *syncBuffer
+// fakeGateway stands in for Stripe. Like Stripe, it returns the original
+// session when an idempotency key is reused.
+type fakeGateway struct {
+	mu       sync.Mutex
+	requests []payment.CheckoutRequest
+	byKey    map[string]payment.Session
+	err      error
 }
 
-func newTestApp(t *testing.T) *testApp {
-	t.Helper()
-	ta := &testApp{t: t, db: pgtest.New(t), mailer: &fakeMailer{}, logs: &syncBuffer{}}
+func (g *fakeGateway) CreateCheckoutSession(_ context.Context, req payment.CheckoutRequest) (payment.Session, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.requests = append(g.requests, req)
+	if g.err != nil {
+		return payment.Session{}, g.err
+	}
+	if s, ok := g.byKey[req.IdempotencyKey]; ok {
+		return s, nil
+	}
+	if g.byKey == nil {
+		g.byKey = map[string]payment.Session{}
+	}
+	id := fmt.Sprintf("cs_test_%d", len(g.byKey)+1)
+	s := payment.Session{ID: id, URL: "https://checkout.stripe.test/c/pay/" + id, ExpiresAt: req.ExpiresAt}
+	g.byKey[req.IdempotencyKey] = s
+	return s, nil
+}
 
-	a, err := app.New(app.Deps{
+func (g *fakeGateway) calls() []payment.CheckoutRequest {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return append([]payment.CheckoutRequest(nil), g.requests...)
+}
+
+// testApp is the full application running against a fresh database.
+type testApp struct {
+	t       *testing.T
+	h       http.Handler
+	app     *app.App
+	db      *pgxpool.Pool
+	mailer  *fakeMailer
+	gateway *fakeGateway
+	logs    *syncBuffer
+}
+
+const testWebhookSecret = "whsec_test_secret"
+
+type testOption func(*app.Deps)
+
+// withoutPayments runs the app as if Stripe were not configured.
+func withoutPayments(d *app.Deps) { d.PaymentGateway = nil }
+
+func newTestApp(t *testing.T, opts ...testOption) *testApp {
+	t.Helper()
+	ta := &testApp{t: t, db: pgtest.New(t), mailer: &fakeMailer{}, gateway: &fakeGateway{}, logs: &syncBuffer{}}
+
+	deps := app.Deps{
 		Config: config.Config{
-			Env:              config.EnvTest,
-			BaseURL:          "http://shop.test",
-			JWTSecret:        "test-secret-test-secret-test-secret",
-			AccessTokenTTL:   15 * time.Minute,
-			RefreshTokenTTL:  time.Hour,
-			PasswordResetTTL: 30 * time.Minute,
+			Env:                 config.EnvTest,
+			BaseURL:             "http://shop.test",
+			JWTSecret:           "test-secret-test-secret-test-secret",
+			AccessTokenTTL:      15 * time.Minute,
+			RefreshTokenTTL:     time.Hour,
+			PasswordResetTTL:    30 * time.Minute,
+			OrderReservationTTL: 30 * time.Minute,
+			StripeWebhookSecret: testWebhookSecret,
 		},
-		Logger:     logging.New(ta.logs, slog.LevelDebug),
-		DB:         ta.db,
-		Mailer:     ta.mailer,
-		BcryptCost: bcrypt.MinCost,
-	})
+		Logger:         logging.New(ta.logs, slog.LevelDebug),
+		DB:             ta.db,
+		Mailer:         ta.mailer,
+		PaymentGateway: ta.gateway,
+		BcryptCost:     bcrypt.MinCost,
+	}
+	for _, opt := range opts {
+		opt(&deps)
+	}
+	a, err := app.New(deps)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -128,6 +128,7 @@ var (
 	ErrNotFound           = errors.New("order: not found")
 	ErrCartEmpty          = errors.New("order: cart is empty")
 	ErrCartHasUnavailable = errors.New("order: cart has items that are no longer for sale")
+	ErrPaymentInProgress  = errors.New("order: a checkout session is still open")
 )
 
 // TransitionError reports a status change the state machine forbids.

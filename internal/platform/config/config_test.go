@@ -44,10 +44,12 @@ func TestLoadDefaults(t *testing.T) {
 
 func TestLoadOverrides(t *testing.T) {
 	cfg, err := Load(env(map[string]string{
-		"APP_ENV":          "production",
-		"HTTP_ADDR":        ":9000",
-		"LOG_LEVEL":        "debug",
-		"SHUTDOWN_TIMEOUT": "3s",
+		"APP_ENV":               "production",
+		"STRIPE_SECRET_KEY":     "sk_live_example",
+		"STRIPE_WEBHOOK_SECRET": "whsec_example",
+		"HTTP_ADDR":             ":9000",
+		"LOG_LEVEL":             "debug",
+		"SHUTDOWN_TIMEOUT":      "3s",
 	}))
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -74,5 +76,33 @@ func TestLoadReportsAllInvalidVariables(t *testing.T) {
 		if !strings.Contains(err.Error(), key) {
 			t.Errorf("error %q does not mention %s", err, key)
 		}
+	}
+}
+
+func TestLoadStripeKeys(t *testing.T) {
+	tests := []struct {
+		name    string
+		vars    map[string]string
+		wantErr string
+	}{
+		{"not configured in development", map[string]string{}, ""},
+		{"test keys", map[string]string{"STRIPE_SECRET_KEY": "sk_test_123", "STRIPE_WEBHOOK_SECRET": "whsec_123"}, ""},
+		{"required in production", map[string]string{"APP_ENV": "production"}, "required in production"},
+		{"only one of the pair", map[string]string{"STRIPE_SECRET_KEY": "sk_test_123"}, "set together"},
+		{"publishable key by mistake", map[string]string{"STRIPE_SECRET_KEY": "pk_test_123", "STRIPE_WEBHOOK_SECRET": "whsec_1"}, "secret or restricted key"},
+		{"live key outside production", map[string]string{"STRIPE_SECRET_KEY": "sk_live_123", "STRIPE_WEBHOOK_SECRET": "whsec_1"}, "only accepted when APP_ENV=production"},
+		{"live key in production", map[string]string{"APP_ENV": "production", "STRIPE_SECRET_KEY": "sk_live_123", "STRIPE_WEBHOOK_SECRET": "whsec_1"}, ""},
+		{"bad webhook secret", map[string]string{"STRIPE_SECRET_KEY": "sk_test_123", "STRIPE_WEBHOOK_SECRET": "secret"}, "whsec_"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Load(env(tt.vars))
+			switch {
+			case tt.wantErr == "" && err != nil:
+				t.Fatalf("Load() error = %v", err)
+			case tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)):
+				t.Fatalf("Load() error = %v, want it to mention %q", err, tt.wantErr)
+			}
+		})
 	}
 }

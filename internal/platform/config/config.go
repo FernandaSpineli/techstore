@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -37,6 +38,11 @@ type Config struct {
 	// OrderReservationTTL is how long stock stays reserved for an unpaid order.
 	OrderReservationTTL time.Duration
 
+	// Stripe is optional outside production: without keys the API runs and
+	// checkout reports that payments are unavailable.
+	StripeSecretKey     Secret
+	StripeWebhookSecret Secret
+
 	SMTPAddr     string
 	SMTPUsername string
 	SMTPPassword Secret
@@ -62,6 +68,9 @@ func Load(getenv func(string) string) (Config, error) {
 
 		JWTSecret: Secret(getenv("JWT_SECRET")),
 
+		StripeSecretKey:     Secret(getenv("STRIPE_SECRET_KEY")),
+		StripeWebhookSecret: Secret(getenv("STRIPE_WEBHOOK_SECRET")),
+
 		SMTPAddr:     lookup(getenv, "SMTP_ADDR", "localhost:1025"),
 		SMTPUsername: getenv("SMTP_USERNAME"),
 		SMTPPassword: Secret(getenv("SMTP_PASSWORD")),
@@ -83,6 +92,7 @@ func Load(getenv func(string) string) (Config, error) {
 	default:
 		errs = append(errs, fmt.Errorf("APP_ENV: unknown environment %q", cfg.Env))
 	}
+	errs = append(errs, validateStripe(cfg)...)
 
 	if err := cfg.LogLevel.UnmarshalText([]byte(lookup(getenv, "LOG_LEVEL", "info"))); err != nil {
 		errs = append(errs, fmt.Errorf("LOG_LEVEL: %w", err))
@@ -106,6 +116,33 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 
 	return cfg, errors.Join(errs...)
+}
+
+func validateStripe(cfg Config) []error {
+	key, hook := cfg.StripeSecretKey.Reveal(), cfg.StripeWebhookSecret.Reveal()
+	var errs []error
+	switch {
+	case key == "" && hook == "":
+		if cfg.Env == EnvProduction {
+			errs = append(errs, errors.New("STRIPE_SECRET_KEY: required in production"))
+		}
+		return errs
+	case key == "" || hook == "":
+		return append(errs, errors.New("STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set together"))
+	}
+	live := strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_")
+	test := strings.HasPrefix(key, "sk_test_") || strings.HasPrefix(key, "rk_test_")
+	switch {
+	case !live && !test:
+		errs = append(errs, errors.New("STRIPE_SECRET_KEY: must be a Stripe secret or restricted key (sk_/rk_)"))
+	case live && cfg.Env != EnvProduction:
+		// A live key in a dev or test environment would move real money.
+		errs = append(errs, errors.New("STRIPE_SECRET_KEY: live keys are only accepted when APP_ENV=production"))
+	}
+	if !strings.HasPrefix(hook, "whsec_") {
+		errs = append(errs, errors.New("STRIPE_WEBHOOK_SECRET: must start with whsec_"))
+	}
+	return errs
 }
 
 func lookup(getenv func(string) string, key, fallback string) string {

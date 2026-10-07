@@ -31,6 +31,9 @@ func toHTTPError(err error) error {
 	switch {
 	case errors.Is(err, ErrNotFound):
 		return errNotFound
+	case errors.Is(err, ErrPaymentInProgress):
+		return httpx.NewError(http.StatusConflict, "PAYMENT_IN_PROGRESS",
+			"A checkout for this order is still open; try again once it has closed")
 	case errors.Is(err, ErrCartEmpty):
 		return httpx.NewError(http.StatusUnprocessableEntity, "CART_EMPTY", "Add items to the cart before placing an order")
 	case errors.As(err, &unavailable):

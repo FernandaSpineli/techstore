@@ -163,11 +163,11 @@ func (s *Service) List(ctx context.Context, f ListFilter, page httpx.Page) ([]Su
 
 // Cancel cancels one of the user's unpaid orders and releases its stock.
 func (s *Service) Cancel(ctx context.Context, userID, orderID string) (Order, error) {
-	return s.transition(ctx, orderID, StatusCancelled, "cancelled by customer", func(o Order) error {
+	return s.transition(ctx, orderID, StatusCancelled, "cancelled by customer", func(tx pgx.Tx, o Order) error {
 		if o.UserID != userID {
 			return ErrNotFound
 		}
-		return nil
+		return noOpenCheckout(ctx, tx, o.ID)
 	})
 }
 
@@ -177,12 +177,34 @@ func (s *Service) AdminSetStatus(ctx context.Context, orderID string, to Status,
 	if !adminTargets[to] {
 		return Order{}, &TransitionError{To: to}
 	}
-	return s.transition(ctx, orderID, to, reason, nil)
+	return s.transition(ctx, orderID, to, reason, func(tx pgx.Tx, o Order) error {
+		if to == StatusCancelled {
+			return noOpenCheckout(ctx, tx, o.ID)
+		}
+		return nil
+	})
+}
+
+// noOpenCheckout refuses to cancel while the customer may still be paying:
+// cancelling then would take their money for a cancelled order. Once the
+// Stripe session closes (at most 30 minutes) the order can be cancelled.
+func noOpenCheckout(ctx context.Context, tx pgx.Tx, orderID string) error {
+	var open bool
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM payments WHERE order_id = $1 AND status = 'pending' AND expires_at > now())`,
+		orderID).Scan(&open)
+	if err != nil {
+		return fmt.Errorf("order: check open checkout: %w", err)
+	}
+	if open {
+		return ErrPaymentInProgress
+	}
+	return nil
 }
 
 // transition moves an order to a new status in its own transaction. check,
 // if set, can veto the change after the order is locked.
-func (s *Service) transition(ctx context.Context, orderID string, to Status, reason string, check func(Order) error) (Order, error) {
+func (s *Service) transition(ctx context.Context, orderID string, to Status, reason string, check func(pgx.Tx, Order) error) (Order, error) {
 	var from Status
 	err := postgres.WithTx(ctx, s.db, func(tx pgx.Tx) error {
 		o, err := Lock(ctx, tx, orderID)
@@ -190,7 +212,7 @@ func (s *Service) transition(ctx context.Context, orderID string, to Status, rea
 			return err
 		}
 		if check != nil {
-			if err := check(o); err != nil {
+			if err := check(tx, o); err != nil {
 				return err
 			}
 		}
