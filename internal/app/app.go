@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FernandaSpineli/techstore/internal/auth"
+	"github.com/FernandaSpineli/techstore/internal/catalog"
+	"github.com/FernandaSpineli/techstore/internal/inventory"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/mail"
 	"github.com/FernandaSpineli/techstore/internal/user"
@@ -54,7 +56,12 @@ func New(d Deps) (*App, error) {
 	}
 
 	a := &App{auth: authSvc}
-	a.Handler = routes(d, authSvc, auth.NewHandler(authSvc), user.NewHandler(d.DB))
+	a.Handler = routes(d, authSvc, handlers{
+		auth:      auth.NewHandler(authSvc),
+		user:      user.NewHandler(d.DB),
+		catalog:   catalog.NewHandler(catalog.NewStore(d.DB)),
+		inventory: inventory.NewHandler(inventory.NewStore(d.DB)),
+	})
 	return a, nil
 }
 

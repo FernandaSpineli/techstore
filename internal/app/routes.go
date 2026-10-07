@@ -4,15 +4,29 @@ import (
 	"net/http"
 
 	"github.com/FernandaSpineli/techstore/internal/auth"
+	"github.com/FernandaSpineli/techstore/internal/catalog"
+	"github.com/FernandaSpineli/techstore/internal/inventory"
 	"github.com/FernandaSpineli/techstore/internal/platform/httpx"
 	"github.com/FernandaSpineli/techstore/internal/user"
 )
 
+// handlers are the HTTP entry points of every module.
+type handlers struct {
+	auth      *auth.Handler
+	user      *user.Handler
+	catalog   *catalog.Handler
+	inventory *inventory.Handler
+}
+
 // routes lists every endpoint in one place, with the middleware that guards
 // it, so the API surface and its access rules can be reviewed at a glance.
-func routes(d Deps, authSvc *auth.Service, authH *auth.Handler, userH *user.Handler) http.Handler {
+func routes(d Deps, authSvc *auth.Service, hs handlers) http.Handler {
 	mux := http.NewServeMux()
 	signedIn := auth.Authenticate(authSvc)
+	admin := func(next http.Handler) http.Handler {
+		return signedIn(auth.RequireRole(auth.RoleAdmin)(next))
+	}
+	authH, userH, catalogH, inventoryH := hs.auth, hs.user, hs.catalog, hs.inventory
 
 	type h = httpx.HandlerFunc
 
@@ -31,6 +45,25 @@ func routes(d Deps, authSvc *auth.Service, authH *auth.Handler, userH *user.Hand
 	mux.Handle("GET /api/v1/users/me", signedIn(h(userH.Me)))
 	mux.Handle("PATCH /api/v1/users/me", signedIn(h(userH.UpdateMe)))
 	mux.Handle("PUT /api/v1/users/me/password", signedIn(h(authH.ChangePassword)))
+
+	// Catalog (public)
+	mux.Handle("GET /api/v1/categories", h(catalogH.ListCategories))
+	mux.Handle("GET /api/v1/products", h(catalogH.ListProducts))
+	mux.Handle("GET /api/v1/products/{slug}", h(catalogH.GetProduct))
+
+	// Catalog and inventory (admin)
+	mux.Handle("POST /api/v1/categories", admin(h(catalogH.CreateCategory)))
+	mux.Handle("PATCH /api/v1/categories/{id}", admin(h(catalogH.UpdateCategory)))
+	mux.Handle("DELETE /api/v1/categories/{id}", admin(h(catalogH.DeleteCategory)))
+	mux.Handle("GET /api/v1/admin/products", admin(h(catalogH.AdminListProducts)))
+	mux.Handle("GET /api/v1/admin/products/{id}", admin(h(catalogH.AdminGetProduct)))
+	mux.Handle("POST /api/v1/products", admin(h(catalogH.CreateProduct)))
+	mux.Handle("PATCH /api/v1/products/{id}", admin(h(catalogH.UpdateProduct)))
+	mux.Handle("DELETE /api/v1/products/{id}", admin(h(catalogH.DeleteProduct)))
+	mux.Handle("POST /api/v1/products/{id}/variants", admin(h(catalogH.CreateVariant)))
+	mux.Handle("PATCH /api/v1/variants/{id}", admin(h(catalogH.UpdateVariant)))
+	mux.Handle("GET /api/v1/variants/{id}/inventory", admin(h(inventoryH.Get)))
+	mux.Handle("PUT /api/v1/variants/{id}/inventory", admin(h(inventoryH.Set)))
 
 	// Unknown routes get the standard error envelope instead of net/http's
 	// plain-text 404.
