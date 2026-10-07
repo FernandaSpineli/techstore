@@ -23,6 +23,8 @@ type Config struct {
 	HTTPAddr        string
 	LogLevel        slog.Level
 	ShutdownTimeout time.Duration
+	DatabaseURL     Secret
+	RedisURL        Secret
 }
 
 // Load builds a Config from getenv (usually os.Getenv). It reports every
@@ -32,8 +34,17 @@ func Load(getenv func(string) string) (Config, error) {
 	var errs []error
 
 	cfg := Config{
-		Env:      Env(lookup(getenv, "APP_ENV", string(EnvDevelopment))),
-		HTTPAddr: lookup(getenv, "HTTP_ADDR", ":8080"),
+		Env:         Env(lookup(getenv, "APP_ENV", string(EnvDevelopment))),
+		HTTPAddr:    lookup(getenv, "HTTP_ADDR", ":8080"),
+		DatabaseURL: Secret(getenv("DATABASE_URL")),
+		RedisURL:    Secret(getenv("REDIS_URL")),
+	}
+
+	if cfg.DatabaseURL == "" {
+		errs = append(errs, errors.New("DATABASE_URL: required"))
+	}
+	if cfg.RedisURL == "" {
+		errs = append(errs, errors.New("REDIS_URL: required"))
 	}
 
 	switch cfg.Env {

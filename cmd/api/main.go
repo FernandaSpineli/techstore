@@ -15,6 +15,8 @@ import (
 
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
+	"github.com/FernandaSpineli/techstore/internal/platform/postgres"
+	"github.com/FernandaSpineli/techstore/internal/platform/redisx"
 	"github.com/FernandaSpineli/techstore/internal/server"
 )
 
@@ -37,9 +39,30 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer) erro
 	logger := logging.New(stdout, cfg.LogLevel).With("service", "techstore", "env", string(cfg.Env))
 	slog.SetDefault(logger)
 
+	db, err := postgres.Connect(ctx, cfg.DatabaseURL.Reveal())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	redisx.SetLogger(logger)
+	rdb, err := redisx.Connect(ctx, cfg.RedisURL.Reveal())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rdb.Close() }()
+
+	handler := server.NewHandler(server.Deps{
+		Logger: logger,
+		ReadinessChecks: map[string]func(context.Context) error{
+			"postgres": db.Ping,
+			"redis":    func(ctx context.Context) error { return rdb.Ping(ctx).Err() },
+		},
+	})
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           server.NewHandler(server.Deps{Logger: logger}),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

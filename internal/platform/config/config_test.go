@@ -7,7 +7,15 @@ import (
 	"time"
 )
 
-func env(vars map[string]string) func(string) string {
+// env returns a getenv func with the required variables set, plus overrides.
+func env(overrides map[string]string) func(string) string {
+	vars := map[string]string{
+		"DATABASE_URL": "postgres://localhost/techstore",
+		"REDIS_URL":    "redis://localhost:6379/0",
+	}
+	for k, v := range overrides {
+		vars[k] = v
+	}
 	return func(key string) string { return vars[key] }
 }
 
@@ -50,11 +58,13 @@ func TestLoadReportsAllInvalidVariables(t *testing.T) {
 		"APP_ENV":          "staging",
 		"LOG_LEVEL":        "loud",
 		"SHUTDOWN_TIMEOUT": "-1s",
+		"DATABASE_URL":     "",
+		"REDIS_URL":        "",
 	}))
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
 	}
-	for _, key := range []string{"APP_ENV", "LOG_LEVEL", "SHUTDOWN_TIMEOUT"} {
+	for _, key := range []string{"APP_ENV", "LOG_LEVEL", "SHUTDOWN_TIMEOUT", "DATABASE_URL", "REDIS_URL"} {
 		if !strings.Contains(err.Error(), key) {
 			t.Errorf("error %q does not mention %s", err, key)
 		}
