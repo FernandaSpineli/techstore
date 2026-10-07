@@ -20,9 +20,10 @@ import (
 )
 
 const (
-	// sessionTTL is how long the hosted checkout stays open; Stripe accepts
-	// 30 minutes to 24 hours.
-	sessionTTL = 30 * time.Minute
+	// sessionTTL is how long the hosted checkout stays open. Stripe requires
+	// at least 30 minutes from the moment it creates the session, which is
+	// slightly after this timestamp is computed, so keep a margin.
+	sessionTTL = 31 * time.Minute
 	// reservationGrace keeps the stock reserved a little past the session's
 	// end, so a payment completed at the last second still finds it.
 	reservationGrace = 5 * time.Minute

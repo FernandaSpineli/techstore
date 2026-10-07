@@ -100,8 +100,9 @@ func TestCheckoutCreatesSessionFromTheOrder(t *testing.T) {
 	if !strings.HasPrefix(req.SuccessURL, "http://shop.test/checkout/success?order_id=") {
 		t.Errorf("success URL = %q", req.SuccessURL)
 	}
-	if ttl := time.Until(req.ExpiresAt); ttl < 29*time.Minute || ttl > 31*time.Minute {
-		t.Errorf("session expires in %v, want ~30m (Stripe's minimum)", ttl)
+	// Stripe rejects sessions expiring less than 30 minutes after creation.
+	if ttl := time.Until(req.ExpiresAt); ttl <= 30*time.Minute || ttl > 32*time.Minute {
+		t.Errorf("session expires in %v, want just over Stripe's 30-minute minimum", ttl)
 	}
 
 	// The reservation now outlives the session, so the sweeper cannot expire
