@@ -68,6 +68,19 @@ func newRequestID() string {
 	return hex.EncodeToString(b)
 }
 
+type accessLogAttrsKey struct{}
+
+type accessLogAttrs struct{ attrs []slog.Attr }
+
+// AddAccessLogAttrs attaches attributes (such as the authenticated user ID)
+// to the access log line of the current request. Inner middleware learns
+// things the outer access logger cannot see on its own.
+func AddAccessLogAttrs(ctx context.Context, attrs ...slog.Attr) {
+	if a, ok := ctx.Value(accessLogAttrsKey{}).(*accessLogAttrs); ok {
+		a.attrs = append(a.attrs, attrs...)
+	}
+}
+
 // AccessLog stores a request-scoped logger in the context and logs one line
 // per request. Request bodies and headers are never logged.
 func AccessLog(base *slog.Logger) Middleware {
@@ -75,7 +88,9 @@ func AccessLog(base *slog.Logger) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			logger := base.With("request_id", RequestIDFrom(r.Context()))
-			r = r.WithContext(logging.WithLogger(r.Context(), logger))
+			extra := &accessLogAttrs{}
+			ctx := logging.WithLogger(r.Context(), logger)
+			r = r.WithContext(context.WithValue(ctx, accessLogAttrsKey{}, extra))
 			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 
 			next.ServeHTTP(rec, r)
@@ -92,6 +107,7 @@ func AccessLog(base *slog.Logger) Middleware {
 				slog.Int("bytes", rec.bytes),
 				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
 				slog.String("remote_ip", remoteIP(r)),
+				slog.GroupAttrs("", extra.attrs...), // an empty group key inlines the attrs
 			)
 		})
 	}
