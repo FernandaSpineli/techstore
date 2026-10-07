@@ -16,6 +16,7 @@ import (
 	"github.com/FernandaSpineli/techstore/internal/platform/idempotency"
 	"github.com/FernandaSpineli/techstore/internal/platform/ratelimit"
 	"github.com/FernandaSpineli/techstore/internal/user"
+	"github.com/FernandaSpineli/techstore/web"
 )
 
 // handlers are the HTTP entry points of every module.
@@ -42,6 +43,12 @@ func routes(d Deps, authSvc *auth.Service, hs handlers) http.Handler {
 	rc := newRedisFeatures(d)
 
 	type h = httpx.HandlerFunc
+
+	// Demo storefront (same origin as the API)
+	for _, page := range []string{"GET /{$}", "GET /reset-password", "GET /checkout/success", "GET /checkout/cancel"} {
+		mux.HandleFunc(page, web.Page)
+	}
+	mux.Handle("GET /assets/", web.Assets())
 
 	mux.HandleFunc("GET /healthz", healthz)
 	mux.HandleFunc("GET /readyz", readyz(d.ReadinessChecks))
@@ -110,6 +117,8 @@ func routes(d Deps, authSvc *auth.Service, hs handlers) http.Handler {
 		httpx.RequestID,
 		httpx.AccessLog(d.Logger),
 		httpx.Recover,
+		httpx.SecurityHeaders,
+		httpx.CORS(d.Config.CORSAllowedOrigins),
 		rc.apiLimit,
 	)
 }

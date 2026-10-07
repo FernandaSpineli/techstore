@@ -39,6 +39,10 @@ type Config struct {
 	// OrderReservationTTL is how long stock stays reserved for an unpaid order.
 	OrderReservationTTL time.Duration
 
+	// CORSAllowedOrigins lists browser origins allowed to call the API. The
+	// bundled storefront is same-origin and needs none.
+	CORSAllowedOrigins []string
+
 	// Requests per minute per client IP: AuthRateLimit on sign-in, sign-up
 	// and password endpoints, APIRateLimit on everything under /api.
 	AuthRateLimit int
@@ -73,6 +77,8 @@ func Load(getenv func(string) string) (Config, error) {
 		DatabaseURL: Secret(getenv("DATABASE_URL")),
 		RedisURL:    Secret(getenv("REDIS_URL")),
 		BaseURL:     lookup(getenv, "APP_BASE_URL", "http://localhost:8080"),
+
+		CORSAllowedOrigins: parseOrigins(getenv("CORS_ALLOWED_ORIGINS")),
 
 		JWTSecret: Secret(getenv("JWT_SECRET")),
 
@@ -166,6 +172,18 @@ func validateStripe(cfg Config) []error {
 		errs = append(errs, errors.New("STRIPE_WEBHOOK_SECRET: must start with whsec_"))
 	}
 	return errs
+}
+
+// parseOrigins splits a comma-separated list of origins, dropping blanks
+// and trailing slashes (browsers send origins without them).
+func parseOrigins(s string) []string {
+	var out []string
+	for o := range strings.SplitSeq(s, ",") {
+		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o != "" {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 func lookup(getenv func(string) string, key, fallback string) string {

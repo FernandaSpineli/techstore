@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TechStore</title>
+  <meta name="description" content="Loja de eletrônicos de demonstração da API TechStore">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' rx='2' fill='%232747D9'/%3E%3C/svg%3E">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Pular para o conteúdo</a>
+  <header class="bar">
+    <a class="brand" href="#/">TechStore</a>
+    <form class="search" role="search" id="search-form">
+      <label for="q" class="sr-only">Buscar produtos</label>
+      <input id="q" name="q" type="search" placeholder="Buscar produtos, marcas…" autocomplete="off">
+    </form>
+    <nav class="account" id="account" aria-label="Conta"></nav>
+  </header>
+
+  <div class="layout">
+    <main id="main" tabindex="-1" aria-live="polite"></main>
+
+    <aside class="trace" id="trace" aria-label="Requisições à API">
+      <div class="trace-head">
+        <h2>Requisições</h2>
+        <p>O que esta página pediu à API, mais recente primeiro.</p>
+      </div>
+      <ol id="trace-list" class="trace-list"></ol>
+    </aside>
+  </div>
+  <button class="trace-toggle" id="trace-toggle" type="button" aria-controls="trace" aria-expanded="false">Ver requisições</button>
+</body>
+</html>

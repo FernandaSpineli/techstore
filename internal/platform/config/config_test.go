@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -104,5 +105,15 @@ func TestLoadStripeKeys(t *testing.T) {
 				t.Fatalf("Load() error = %v, want it to mention %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestParseOrigins(t *testing.T) {
+	cfg, err := Load(env(map[string]string{"CORS_ALLOWED_ORIGINS": " https://a.example/, ,https://b.example "}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.CORSAllowedOrigins, []string{"https://a.example", "https://b.example"}) {
+		t.Errorf("CORSAllowedOrigins = %v", cfg.CORSAllowedOrigins)
 	}
 }
