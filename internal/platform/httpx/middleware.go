@@ -106,14 +106,16 @@ func AccessLog(base *slog.Logger) Middleware {
 				slog.Int("status", rec.status),
 				slog.Int("bytes", rec.bytes),
 				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
-				slog.String("remote_ip", remoteIP(r)),
+				slog.String("remote_ip", ClientIP(r)),
 				slog.GroupAttrs("", extra.attrs...), // an empty group key inlines the attrs
 			)
 		})
 	}
 }
 
-func remoteIP(r *http.Request) string {
+// ClientIP returns the IP address of the connection. Behind a reverse proxy
+// this is the proxy; see the README for the trade-off.
+func ClientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

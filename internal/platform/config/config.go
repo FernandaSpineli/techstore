@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -37,6 +38,13 @@ type Config struct {
 
 	// OrderReservationTTL is how long stock stays reserved for an unpaid order.
 	OrderReservationTTL time.Duration
+
+	// Requests per minute per client IP: AuthRateLimit on sign-in, sign-up
+	// and password endpoints, APIRateLimit on everything under /api.
+	AuthRateLimit int
+	APIRateLimit  int
+	// CatalogCacheTTL bounds how stale a cached catalog response can be.
+	CatalogCacheTTL time.Duration
 
 	// Stripe is optional outside production: without keys the API runs and
 	// checkout reports that payments are unavailable.
@@ -107,12 +115,27 @@ func Load(getenv func(string) string) (Config, error) {
 		{&cfg.RefreshTokenTTL, "REFRESH_TOKEN_TTL", "720h"},
 		{&cfg.PasswordResetTTL, "PASSWORD_RESET_TTL", "30m"},
 		{&cfg.OrderReservationTTL, "ORDER_RESERVATION_TTL", "30m"},
+		{&cfg.CatalogCacheTTL, "CATALOG_CACHE_TTL", "60s"},
 	} {
 		v, err := parseDuration(getenv, d.key, d.def)
 		if err != nil {
 			errs = append(errs, err)
 		}
 		*d.dst = v
+	}
+
+	for _, n := range []struct {
+		dst      *int
+		key, def string
+	}{
+		{&cfg.AuthRateLimit, "RATE_LIMIT_AUTH_PER_MINUTE", "10"},
+		{&cfg.APIRateLimit, "RATE_LIMIT_API_PER_MINUTE", "300"},
+	} {
+		v, err := strconv.Atoi(lookup(getenv, n.key, n.def))
+		if err != nil || v < 1 {
+			errs = append(errs, fmt.Errorf("%s: must be a positive integer", n.key))
+		}
+		*n.dst = v
 	}
 
 	return cfg, errors.Join(errs...)

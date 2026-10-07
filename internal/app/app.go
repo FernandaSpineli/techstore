@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/FernandaSpineli/techstore/internal/auth"
 	"github.com/FernandaSpineli/techstore/internal/cart"
@@ -29,6 +30,9 @@ type Deps struct {
 	Config config.Config
 	Logger *slog.Logger
 	DB     *pgxpool.Pool
+	// Redis backs rate limiting, the catalog cache and idempotency keys;
+	// nil turns those features off.
+	Redis  *redis.Client
 	Mailer mail.Sender
 	// ReadinessChecks are run by GET /readyz, keyed by dependency name.
 	ReadinessChecks map[string]func(context.Context) error

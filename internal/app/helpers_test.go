@@ -22,6 +22,7 @@ import (
 	"github.com/FernandaSpineli/techstore/internal/platform/logging"
 	"github.com/FernandaSpineli/techstore/internal/platform/mail"
 	"github.com/FernandaSpineli/techstore/internal/platform/postgres/pgtest"
+	"github.com/FernandaSpineli/techstore/internal/platform/redisx/redistest"
 )
 
 // fakeGateway stands in for Stripe. Like Stripe, it returns the original
@@ -76,6 +77,12 @@ type testOption func(*app.Deps)
 // withoutPayments runs the app as if Stripe were not configured.
 func withoutPayments(d *app.Deps) { d.PaymentGateway = nil }
 
+// withRateLimits sets the per-minute limits (tests default to very high
+// ones so that fixtures are never throttled).
+func withRateLimits(auth, api int) testOption {
+	return func(d *app.Deps) { d.Config.AuthRateLimit, d.Config.APIRateLimit = auth, api }
+}
+
 func newTestApp(t *testing.T, opts ...testOption) *testApp {
 	t.Helper()
 	ta := &testApp{t: t, db: pgtest.New(t), mailer: &fakeMailer{}, gateway: &fakeGateway{}, logs: &syncBuffer{}}
@@ -90,9 +97,13 @@ func newTestApp(t *testing.T, opts ...testOption) *testApp {
 			PasswordResetTTL:    30 * time.Minute,
 			OrderReservationTTL: 30 * time.Minute,
 			StripeWebhookSecret: testWebhookSecret,
+			AuthRateLimit:       100_000,
+			APIRateLimit:        100_000,
+			CatalogCacheTTL:     time.Minute,
 		},
 		Logger:         logging.New(ta.logs, slog.LevelDebug),
 		DB:             ta.db,
+		Redis:          redistest.New(t),
 		Mailer:         ta.mailer,
 		PaymentGateway: ta.gateway,
 		BcryptCost:     bcrypt.MinCost,

@@ -90,6 +90,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger, db *pgxp
 		Config:         cfg,
 		Logger:         logger,
 		DB:             db,
+		Redis:          rdb,
 		Mailer:         newMailer(cfg),
 		PaymentGateway: gateway,
 		ReadinessChecks: map[string]func(context.Context) error{
