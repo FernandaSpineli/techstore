@@ -1,0 +1,19 @@
+# Environment — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+/bin/
+/dist/
+
+# Test artifacts
+coverage.out
+coverage.html
+*.test
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
