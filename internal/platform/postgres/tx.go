@@ -37,10 +37,38 @@ func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.Tx) error) e
 	return nil
 }
 
-// IsUniqueViolation reports whether err is a unique constraint violation,
-// optionally on a specific constraint.
-func IsUniqueViolation(err error, constraint string) bool {
+// PostgreSQL error codes the stores translate into domain errors.
+const (
+	codeRestrictViolation   = "23001"
+	codeForeignKeyViolation = "23503"
+	codeUniqueViolation     = "23505"
+	codeCheckViolation      = "23514"
+)
+
+func hasCode(err error, code, constraint string) bool {
 	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505" &&
+	return errors.As(err, &pgErr) && pgErr.Code == code &&
 		(constraint == "" || pgErr.ConstraintName == constraint)
+}
+
+// IsUniqueViolation reports whether err violates a unique constraint. An
+// empty constraint matches any.
+func IsUniqueViolation(err error, constraint string) bool {
+	return hasCode(err, codeUniqueViolation, constraint)
+}
+
+// IsForeignKeyViolation reports whether err references a missing row.
+func IsForeignKeyViolation(err error, constraint string) bool {
+	return hasCode(err, codeForeignKeyViolation, constraint)
+}
+
+// IsRestrictViolation reports whether a delete was blocked by an
+// ON DELETE RESTRICT foreign key.
+func IsRestrictViolation(err error, constraint string) bool {
+	return hasCode(err, codeRestrictViolation, constraint)
+}
+
+// IsCheckViolation reports whether err violates a CHECK constraint.
+func IsCheckViolation(err error, constraint string) bool {
+	return hasCode(err, codeCheckViolation, constraint)
 }
