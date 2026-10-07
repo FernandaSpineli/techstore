@@ -187,7 +187,7 @@ func (s *Service) AdminSetStatus(ctx context.Context, orderID string, to Status,
 
 // noOpenCheckout refuses to cancel while the customer may still be paying:
 // cancelling then would take their money for a cancelled order. Once the
-// Stripe session closes (at most 30 minutes) the order can be cancelled.
+// Stripe session closes (about 30 minutes) the order can be cancelled.
 func noOpenCheckout(ctx context.Context, tx pgx.Tx, orderID string) error {
 	var open bool
 	err := tx.QueryRow(ctx, `

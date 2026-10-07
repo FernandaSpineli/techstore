@@ -203,7 +203,7 @@ milliseconds.
 
 - Refunds for late or double payments are flagged in the logs and handled
   manually.
-- Cancelling an order is refused while its Stripe session is open (at most
+- Cancelling an order is refused while its Stripe session is open (about
   30 minutes), instead of expiring the session through the API.
 - `ClientIP` uses the connection's address. Behind a reverse proxy, the
   rate limiter would need the proxy's forwarded header, read only from
