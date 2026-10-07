@@ -1,0 +1,11 @@
+# Lint configuration for docs/openapi.yaml:
+#   docker run --rm -v "$PWD/docs":/spec redocly/cli lint --config /spec/redocly.yaml /spec/openapi.yaml
+extends:
+  - recommended
+rules:
+  # The spec documents a local, docker compose deployment.
+  no-server-example.com: off
+  # No license has been chosen for this project yet.
+  info-license: off
+  # Health probes and the public category list have no client errors.
+  operation-4xx-response: off
