@@ -180,3 +180,17 @@ func Clear(ctx context.Context, q postgres.Querier, userID string) error {
 	}
 	return nil
 }
+
+// LockForCheckout locks the user's cart row until the caller's transaction
+// ends, so the cart cannot change while an order is created from it. A user
+// without a cart has nothing to lock.
+func LockForCheckout(ctx context.Context, q postgres.Querier, userID string) error {
+	_, err := q.Exec(ctx, `SELECT 1 FROM carts WHERE user_id = $1 FOR UPDATE`, userID)
+	if err != nil {
+		return fmt.Errorf("cart: lock for checkout: %w", err)
+	}
+	return nil
+}
+
+// Purchasable reports whether the item can be ordered as it is now.
+func (it Item) Purchasable() bool { return it.purchasable }

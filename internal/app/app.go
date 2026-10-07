@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/FernandaSpineli/techstore/internal/cart"
 	"github.com/FernandaSpineli/techstore/internal/catalog"
 	"github.com/FernandaSpineli/techstore/internal/inventory"
+	"github.com/FernandaSpineli/techstore/internal/order"
 	"github.com/FernandaSpineli/techstore/internal/platform/config"
 	"github.com/FernandaSpineli/techstore/internal/platform/mail"
 	"github.com/FernandaSpineli/techstore/internal/user"
@@ -36,6 +39,9 @@ type Deps struct {
 type App struct {
 	Handler http.Handler
 	auth    *auth.Service
+	orders  *order.Service
+
+	background sync.WaitGroup
 }
 
 // New builds the application.
@@ -56,17 +62,32 @@ func New(d Deps) (*App, error) {
 		return nil, err
 	}
 
-	a := &App{auth: authSvc}
+	orderSvc := order.NewService(d.DB, catalog.Currency, d.Config.OrderReservationTTL)
+	a := &App{auth: authSvc, orders: orderSvc}
 	a.Handler = routes(d, authSvc, handlers{
 		auth:      auth.NewHandler(authSvc),
 		user:      user.NewHandler(d.DB),
 		catalog:   catalog.NewHandler(catalog.NewStore(d.DB)),
 		inventory: inventory.NewHandler(inventory.NewStore(d.DB)),
 		cart:      cart.NewHandler(cart.NewService(d.DB, catalog.Currency)),
+		order:     order.NewHandler(orderSvc),
 	})
 	return a, nil
 }
 
-// Wait blocks until background work started by requests (such as outgoing
-// email) has finished. Call it after the HTTP server has shut down.
-func (a *App) Wait() { a.auth.Wait() }
+// orderSweepInterval is how often expired order reservations are released.
+const orderSweepInterval = time.Minute
+
+// StartBackground starts the background jobs. They stop when ctx is
+// cancelled; Wait blocks until they have.
+func (a *App) StartBackground(ctx context.Context) {
+	a.background.Go(func() { a.orders.RunExpirySweeper(ctx, orderSweepInterval) })
+}
+
+// Wait blocks until background jobs and work started by requests (such as
+// outgoing email) have finished. Call it after the HTTP server has shut
+// down.
+func (a *App) Wait() {
+	a.background.Wait()
+	a.auth.Wait()
+}

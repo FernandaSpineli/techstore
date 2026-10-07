@@ -12,6 +12,7 @@ x-app: &app
     APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
     JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}
     SMTP_ADDR: mailpit:1025
+    ORDER_RESERVATION_TTL: ${ORDER_RESERVATION_TTL:-30m}
 
 services:
   # Applies schema migrations once, before the API starts.

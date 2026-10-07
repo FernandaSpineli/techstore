@@ -34,6 +34,9 @@ type Config struct {
 	RefreshTokenTTL  time.Duration
 	PasswordResetTTL time.Duration
 
+	// OrderReservationTTL is how long stock stays reserved for an unpaid order.
+	OrderReservationTTL time.Duration
+
 	SMTPAddr     string
 	SMTPUsername string
 	SMTPPassword Secret
@@ -93,6 +96,7 @@ func Load(getenv func(string) string) (Config, error) {
 		{&cfg.AccessTokenTTL, "ACCESS_TOKEN_TTL", "15m"},
 		{&cfg.RefreshTokenTTL, "REFRESH_TOKEN_TTL", "720h"},
 		{&cfg.PasswordResetTTL, "PASSWORD_RESET_TTL", "30m"},
+		{&cfg.OrderReservationTTL, "ORDER_RESERVATION_TTL", "30m"},
 	} {
 		v, err := parseDuration(getenv, d.key, d.def)
 		if err != nil {

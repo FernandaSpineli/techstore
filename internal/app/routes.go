@@ -7,6 +7,7 @@ import (
 	"github.com/FernandaSpineli/techstore/internal/cart"
 	"github.com/FernandaSpineli/techstore/internal/catalog"
 	"github.com/FernandaSpineli/techstore/internal/inventory"
+	"github.com/FernandaSpineli/techstore/internal/order"
 	"github.com/FernandaSpineli/techstore/internal/platform/httpx"
 	"github.com/FernandaSpineli/techstore/internal/user"
 )
@@ -18,6 +19,7 @@ type handlers struct {
 	catalog   *catalog.Handler
 	inventory *inventory.Handler
 	cart      *cart.Handler
+	order     *order.Handler
 }
 
 // routes lists every endpoint in one place, with the middleware that guards
@@ -28,7 +30,7 @@ func routes(d Deps, authSvc *auth.Service, hs handlers) http.Handler {
 	admin := func(next http.Handler) http.Handler {
 		return signedIn(auth.RequireRole(auth.RoleAdmin)(next))
 	}
-	authH, userH, catalogH, inventoryH, cartH := hs.auth, hs.user, hs.catalog, hs.inventory, hs.cart
+	authH, userH, catalogH, inventoryH, cartH, orderH := hs.auth, hs.user, hs.catalog, hs.inventory, hs.cart, hs.order
 
 	type h = httpx.HandlerFunc
 
@@ -59,6 +61,17 @@ func routes(d Deps, authSvc *auth.Service, hs handlers) http.Handler {
 	mux.Handle("POST /api/v1/cart/items", signedIn(h(cartH.AddItem)))
 	mux.Handle("PATCH /api/v1/cart/items/{variantId}", signedIn(h(cartH.UpdateItem)))
 	mux.Handle("DELETE /api/v1/cart/items/{variantId}", signedIn(h(cartH.RemoveItem)))
+
+	// Orders (signed-in user)
+	mux.Handle("POST /api/v1/orders", signedIn(h(orderH.Create)))
+	mux.Handle("GET /api/v1/orders", signedIn(h(orderH.List)))
+	mux.Handle("GET /api/v1/orders/{id}", signedIn(h(orderH.Get)))
+	mux.Handle("POST /api/v1/orders/{id}/cancel", signedIn(h(orderH.Cancel)))
+
+	// Orders (admin)
+	mux.Handle("GET /api/v1/admin/orders", admin(h(orderH.AdminList)))
+	mux.Handle("GET /api/v1/admin/orders/{id}", admin(h(orderH.AdminGet)))
+	mux.Handle("PATCH /api/v1/admin/orders/{id}/status", admin(h(orderH.AdminSetStatus)))
 
 	// Catalog and inventory (admin)
 	mux.Handle("POST /api/v1/categories", admin(h(catalogH.CreateCategory)))

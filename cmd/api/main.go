@@ -102,6 +102,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger, db *pgxp
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelWarn),
 	}
 
+	application.StartBackground(ctx)
+
 	serveErr := make(chan error, 1)
 	go func() {
 		logger.Info("http.server.started", "addr", cfg.HTTPAddr)
