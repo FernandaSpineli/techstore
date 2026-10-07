@@ -43,7 +43,9 @@ func scanCategory(row pgx.Row) (Category, error) {
 // ListCategories returns every category ordered by name. The set is small
 // enough not to need pagination.
 func (s *Store) ListCategories(ctx context.Context) ([]Category, error) {
-	rows, err := s.db.Query(ctx, `SELECT `+categoryColumns+` FROM categories ORDER BY name`)
+	// ICU ordering puts "Áudio" next to "Acessórios" rather than after "Z",
+	// which is where byte order (the database default) would put it.
+	rows, err := s.db.Query(ctx, `SELECT `+categoryColumns+` FROM categories ORDER BY name COLLATE "und-x-icu"`)
 	if err != nil {
 		return nil, fmt.Errorf("catalog: list categories: %w", err)
 	}
@@ -190,7 +192,7 @@ func (s *Store) ListProducts(ctx context.Context, f ListFilter, page httpx.Page)
 		SortNewest:    "p.created_at DESC, p.id DESC",
 		SortPriceAsc:  "agg.min_price ASC NULLS LAST, p.id",
 		SortPriceDesc: "agg.min_price DESC NULLS LAST, p.id",
-		SortName:      "p.name, p.id",
+		SortName:      `p.name COLLATE "und-x-icu", p.id`,
 	}[f.Sort]
 	if f.Sort == SortRelevance && tsquery != "" {
 		orderBy = "ts_rank(p.search, to_tsquery('simple', " + tsquery + ")) DESC, p.id"
