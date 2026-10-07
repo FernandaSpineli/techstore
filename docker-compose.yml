@@ -71,14 +71,14 @@ services:
 
   # Catches every outgoing email; open http://localhost:8025 to read them.
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.4
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
 
   # Forwards Stripe test-mode webhooks to the API. Start it with:
   #   docker compose --profile stripe up -d
   stripe:
-    image: stripe/stripe-cli:latest
+    image: stripe/stripe-cli:v1.53.0
     profiles: ["stripe"]
     command: ["listen", "--forward-to", "api:8080/api/v1/payments/webhook"]
     environment:
