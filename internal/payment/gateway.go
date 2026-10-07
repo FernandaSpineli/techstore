@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/stripe/stripe-go/v86"
@@ -53,9 +54,36 @@ type StripeGateway struct {
 	client *stripe.Client
 }
 
-// NewStripeGateway returns a gateway using secretKey.
-func NewStripeGateway(secretKey string) *StripeGateway {
-	return &StripeGateway{client: stripe.NewClient(secretKey)}
+// NewStripeGateway returns a gateway using secretKey. The Stripe library's
+// own log lines go to logger at debug level: failures are already logged by
+// this package, in structured form.
+func NewStripeGateway(secretKey string, logger *slog.Logger) *StripeGateway {
+	return newStripeGateway(secretKey, logger, "")
+}
+
+// newStripeGateway lets tests point the client at a fake API server.
+func newStripeGateway(secretKey string, logger *slog.Logger, apiURL string) *StripeGateway {
+	cfg := &stripe.BackendConfig{
+		LeveledLogger:     stripeLogger{logger},
+		MaxNetworkRetries: stripe.Int64(2), // retried calls reuse the idempotency key
+		EnableTelemetry:   stripe.Bool(false),
+	}
+	if apiURL != "" {
+		cfg.URL = stripe.String(apiURL)
+	}
+	return &StripeGateway{client: stripe.NewClient(secretKey, stripe.WithBackends(stripe.NewBackendsWithConfig(cfg)))}
+}
+
+// stripeLogger adapts slog to stripe.LeveledLoggerInterface.
+type stripeLogger struct{ l *slog.Logger }
+
+func (s stripeLogger) Debugf(format string, v ...any) { s.log(format, v...) }
+func (s stripeLogger) Infof(format string, v ...any)  { s.log(format, v...) }
+func (s stripeLogger) Warnf(format string, v ...any)  { s.log(format, v...) }
+func (s stripeLogger) Errorf(format string, v ...any) { s.log(format, v...) }
+
+func (s stripeLogger) log(format string, v ...any) {
+	s.l.Debug("stripe.client", "detail", fmt.Sprintf(format, v...))
 }
 
 // CreateCheckoutSession implements Gateway.

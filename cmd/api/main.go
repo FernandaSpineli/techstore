@@ -93,7 +93,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger, db *pgxp
 
 	var gateway payment.Gateway
 	if key := cfg.StripeSecretKey.Reveal(); key != "" {
-		gateway = payment.NewStripeGateway(key)
+		gateway = payment.NewStripeGateway(key, logger)
 	} else {
 		logger.Warn("payment.disabled", "reason", "STRIPE_SECRET_KEY is not set; checkout will answer 503")
 	}
