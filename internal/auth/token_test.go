@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var testSecret = []byte("0123456789abcdef0123456789abcdef")
+var testSecret = []byte("test-secret-test-secret-test-secret")
 
 func fixedClock(t time.Time) func() time.Time { return func() time.Time { return t } }
 

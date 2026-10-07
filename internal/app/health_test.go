@@ -22,7 +22,7 @@ import (
 func newHandler(t *testing.T, checks map[string]func(context.Context) error) http.Handler {
 	t.Helper()
 	a, err := New(Deps{
-		Config:          config.Config{JWTSecret: "0123456789abcdef0123456789abcdef"},
+		Config:          config.Config{JWTSecret: "test-secret-test-secret-test-secret"},
 		Logger:          logging.New(&bytes.Buffer{}, slog.LevelInfo),
 		ReadinessChecks: checks,
 		BcryptCost:      bcrypt.MinCost,

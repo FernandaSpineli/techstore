@@ -48,15 +48,21 @@ jobs:
           name: coverage
           path: coverage.out
 
-  vulncheck:
+  security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # scan the whole history for secrets
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: gitleaks
+        run: docker run --rm -v "$PWD":/repo zricethezav/gitleaks:v8.30.1 git /repo --no-banner --redact
+      - name: hadolint
+        run: docker run --rm -i hadolint/hadolint < Dockerfile
 
   build:
     needs: [lint, test]

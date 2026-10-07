@@ -208,7 +208,7 @@ pull request:
 1. **lint:** `go mod tidy -diff` and golangci-lint.
 2. **test:** `go vet` and the full test suite with `-race`, plus a coverage
    summary and artifact.
-3. **vulncheck:** govulncheck.
+3. **security:** govulncheck, gitleaks over the full history, and hadolint.
 4. **build:** the binary and the Docker image (BuildKit cache).
 
 Dependabot keeps modules, actions and base images current.

@@ -13,7 +13,7 @@ func env(overrides map[string]string) func(string) string {
 	vars := map[string]string{
 		"DATABASE_URL": "postgres://localhost/techstore",
 		"REDIS_URL":    "redis://localhost:6379/0",
-		"JWT_SECRET":   "0123456789abcdef0123456789abcdef",
+		"JWT_SECRET":   "test-secret-test-secret-test-secret",
 	}
 	for k, v := range overrides {
 		vars[k] = v

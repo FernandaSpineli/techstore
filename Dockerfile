@@ -15,5 +15,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/api /api
 EXPOSE 8080
-USER nonroot:nonroot
+# 65532 is the "nonroot" user of distroless images.
+USER 65532:65532
 ENTRYPOINT ["/api"]
