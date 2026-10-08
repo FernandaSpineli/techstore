@@ -1,4 +1,4 @@
 # Test fixtures, not secrets: a placeholder JWT key used by unit tests in
-# commit fe99fd6 (later replaced by an obviously fake value).
-fe99fd6da3c687f0c9d8da1498c309adbab6d3f1:internal/app/health_test.go:generic-api-key:25
-fe99fd6da3c687f0c9d8da1498c309adbab6d3f1:internal/platform/config/config_test.go:generic-api-key:15
+# commit eb9db48 (later replaced by an obviously fake value).
+eb9db4837b806675ceb900ae7215082f85297641:internal/app/health_test.go:generic-api-key:25
+eb9db4837b806675ceb900ae7215082f85297641:internal/platform/config/config_test.go:generic-api-key:15
