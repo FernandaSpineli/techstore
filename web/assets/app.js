@@ -221,40 +221,51 @@ async function catalogPage(params) {
   }), " Só em estoque");
 
   const items = list.data.data;
-  const table = items.length === 0
+  const total = list.data.pagination.total;
+  const parts = items.length === 0
     ? h("div", { class: "empty" }, q ? `Nada encontrado para “${q}”. Tente outro termo.` : "Nenhum produto nesta categoria ainda.")
-    : h("table", { class: "products" },
-        h("thead", {}, h("tr", {}, h("th", {}, "Produto"), h("th", { class: "brand-col" }, "Marca"), h("th", { class: "num" }, "A partir de"), h("th", { class: "avail-col" }, "Disponibilidade"))),
-        h("tbody", {}, items.map((p) => h("tr", {},
-          h("td", { class: "name" }, h("a", { href: "#/p/" + p.slug }, p.name), h("div", { class: "stock out" }, p.category.name),
-            h("div", { class: "stock-sm stock " + (p.in_stock ? "in" : "out") }, p.in_stock ? "Em estoque" : "Esgotado")),
-          h("td", { class: "brand-col" }, p.brand),
-          h("td", { class: "num" }, money.format(p.min_price_cents / 100)),
-          h("td", { class: "avail-col" }, h("span", { class: "stock " + (p.in_stock ? "in" : "out") }, p.in_stock ? "Em estoque" : "Esgotado"))))));
+    : h("ul", { class: "parts" }, items.map((p) => h("li", { class: "part" + (p.in_stock ? "" : " out") },
+        h("span", { class: "led" + (p.in_stock ? " on" : ""), title: p.in_stock ? "Em estoque" : "Esgotado" },
+          h("span", { class: "sr-only" }, p.in_stock ? "Em estoque" : "Esgotado")),
+        h("div", {},
+          h("div", { class: "part-name" }, h("a", { href: "#/p/" + p.slug }, p.name)),
+          h("span", { class: "part-cat" }, p.category.name)),
+        h("span", { class: "part-brand" }, p.brand),
+        h("span", { class: "part-price" }, h("small", {}, p.in_stock ? "a partir de" : "esgotado"), money.format(p.min_price_cents / 100)))));
 
   render(
     h("h1", {}, q ? `Resultados para “${q}”` : "Eletrônicos e acessórios"),
-    h("p", { class: "lede" }, `${list.data.pagination.total} produto(s). Os preços estão em reais e o estoque é conferido de novo ao fechar o pedido.`),
+    h("p", { class: "lede" }, `${total} ${total === 1 ? "produto" : "produtos"}. O estoque é conferido de novo quando você fecha o pedido.`),
     h("div", { class: "controls" }, chips, sortSelect, inStock),
-    table);
+    parts);
 }
 
 async function productPage(slug) {
   const { data: p } = await api("GET", "/products/" + encodeURIComponent(slug));
   const firstAvailable = p.variants.find((v) => v.in_stock) || p.variants[0];
-  const price = h("div", { class: "price" }, money.format(firstAvailable.price_cents / 100));
-  const qty = h("input", { type: "number", min: "1", max: "99", value: "1", "aria-label": "Quantidade", class: "qty-input" });
+  const price = h("div", { class: "price" });
+  const stock = h("p", { class: "buy-stock" });
+  const specs = h("dl", { class: "specs" });
+  const qty = h("input", { type: "number", min: "1", max: "99", value: "1", class: "qty-input", id: "qty" });
   const msg = h("div");
+
+  const show = (v) => {
+    price.textContent = money.format(v.price_cents / 100);
+    stock.replaceChildren(h("span", { class: "led" + (v.in_stock ? " on" : "") }), v.in_stock ? "Em estoque" : "Esgotado");
+    specs.replaceChildren(...Object.entries(v.attributes || {}).flatMap(([k, val]) => [h("dt", {}, k), h("dd", {}, val)]),
+      h("dt", {}, "Código"), h("dd", {}, v.sku));
+  };
 
   const variants = h("fieldset", { class: "variants" },
     h("legend", { class: "sr-only" }, "Versão"),
     p.variants.map((v) => h("label", { class: "variant" },
       h("input", {
         type: "radio", name: "variant", value: v.id, disabled: !v.in_stock, checked: v.id === firstAvailable.id,
-        onchange: () => { price.textContent = money.format(v.price_cents / 100); },
+        onchange: () => show(v),
       }),
-      h("span", {}, h("strong", {}, v.name), h("span", { class: "stock block " + (v.in_stock ? "in" : "out") }, v.in_stock ? "Em estoque" : "Esgotado")),
-      h("span", {}, money.format(v.price_cents / 100)))));
+      h("span", {}, h("strong", {}, v.name), h("span", { class: "sku" }, v.in_stock ? v.sku : "Esgotado")),
+      h("span", { class: "vprice" }, money.format(v.price_cents / 100)))));
+  show(firstAvailable);
 
   const add = h("button", { class: "btn block", type: "button", disabled: !firstAvailable.in_stock }, "Adicionar ao carrinho");
   add.addEventListener("click", async () => {
@@ -274,15 +285,17 @@ async function productPage(slug) {
   });
 
   render(
-    h("p", {}, h("a", { href: "#/?category=" + p.category.slug }, p.category.name)),
+    h("p", { class: "crumb" }, h("a", { href: "#/?category=" + p.category.slug }, p.category.name)),
     h("div", { class: "product" },
       h("div", {},
         h("h1", {}, p.name),
-        h("p", { class: "lede" }, p.brand),
+        h("p", { class: "maker" }, p.brand),
         p.description && h("p", { class: "description" }, p.description),
         h("h2", {}, "Escolha a versão"),
-        variants),
-      h("div", { class: "buy" }, price, h("p", {}, h("label", {}, "Quantidade ", qty)), add, msg)));
+        variants,
+        h("h2", {}, "Ficha técnica"),
+        specs),
+      h("div", { class: "buy" }, price, stock, h("label", { for: "qty" }, "Quantidade", qty), add, msg)));
 }
 
 // ---------------------------------------------------------------- cart
@@ -339,7 +352,7 @@ async function cartPage(flash) {
           h("button", { type: "button", "aria-label": "Aumentar", onclick: () => change(it.variant_id, it.quantity + 1) }, "+"))),
         h("td", { class: "num" }, money.format(it.line_total_cents / 100)))))),
     h("div", { class: "summary" },
-      h("span", { class: "total" }, "Subtotal ", money.format(cart.subtotal_cents / 100)),
+      h("span", { class: "total" }, h("small", {}, "Subtotal"), money.format(cart.subtotal_cents / 100)),
       place),
     !cart.checkout_ready && h("p", { class: "lede" }, "Resolva os itens marcados para fechar o pedido."));
 }
@@ -387,11 +400,11 @@ async function orderPage(id, flash) {
         orderPage(id, notice(err.message, "error"));
       }
     });
-    actions.append(h("span", {}, "Reservado até ", dateTime.format(new Date(o.expires_at))), h("span", {}, cancel, " ", pay));
+    actions.append(h("span", {}, "Estoque reservado até ", dateTime.format(new Date(o.expires_at))), h("span", { class: "actions" }, cancel, pay));
   }
 
   render(
-    h("p", {}, h("a", { href: "#/orders" }, "Pedidos")),
+    h("p", { class: "crumb" }, h("a", { href: "#/orders" }, "Pedidos")),
     h("h1", {}, "Pedido #" + o.id.slice(-8)),
     h("p", {}, h("span", { class: "status " + o.status }, statusLabel[o.status])),
     flash || "",
@@ -402,7 +415,7 @@ async function orderPage(id, flash) {
         h("td", { class: "num hide-sm" }, money.format(it.unit_price_cents / 100)),
         h("td", { class: "num" }, it.quantity),
         h("td", { class: "num" }, money.format(it.line_total_cents / 100)))))),
-    h("div", { class: "summary" }, h("span", { class: "total" }, "Total ", money.format(o.total_cents / 100))),
+    h("div", { class: "summary" }, h("span", { class: "total" }, h("small", {}, "Total"), money.format(o.total_cents / 100))),
     actions,
     h("h2", {}, "Histórico"),
     h("ol", { class: "timeline" }, o.status_history.map((c) => h("li", {},
