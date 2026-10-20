@@ -27,7 +27,8 @@ function h(tag, attrs, ...children) {
 }
 
 function render(...nodes) {
-  $main.replaceChildren(...nodes);
+  // Conditional parts arrive as false or null: drop them, or they print as text.
+  $main.replaceChildren(...nodes.filter((n) => n != null && n !== false));
   $main.focus({ preventScroll: true });
   window.scrollTo(0, 0);
 }
